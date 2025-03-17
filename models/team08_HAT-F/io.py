@@ -62,7 +62,7 @@ def forward(img_lq, model, tile=None, tile_overlap=32, scale=4, window_size=16):
         return output
 
     else:
-        # 切片推理
+
         b, c, h, w = img_lq.size()
         tile = min(tile, h, w)
         sf = scale
@@ -146,7 +146,7 @@ def main(model_dir, input_path, output_path, device=None):
 
     model = HAT()
     # model.load_state_dict(torch.load(model_dir), strict=True)
-    # 加载模型状态字典
+
     state_dict = torch.load(model_dir)
 
 
