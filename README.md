@@ -1,5 +1,26 @@
 # [NTIRE 2025 Challenge on Image Super-Resolution (x4)](https://cvlai.net/ntire/2025/) @ [CVPR 2025](https://cvpr.thecvf.com/)
 
+## Environment
+
+- [PyTorch >= 1.7](https://pytorch.org/) **(we used PyTorch version 1.10.)**
+- basicsr == 1.4.2 **（pip install basicsr）**
+
+## How to get restored images?
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python test.py --test_dir [path to test data dir] --save_dir [path to your save dir] --model_id 8
+```
+
+The results are saved in `[path to your save dir]/08_HAT-F_baseline/test`
+
+## How to test?
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python eval.py --output_folder [[path to your save dir]/08_HAT-F_baseline/test] --target_folder [path to test_dir HR]  --metrics_save_path [./IQA_results] --gpu_ids 0
+```
+
+
+
 ## How to test the baseline model?
 
 1. `git clone https://github.com/zhengchen1999/NTIRE2025_ImageSR_x4.git`

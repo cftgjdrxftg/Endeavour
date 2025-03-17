@@ -15,12 +15,13 @@ def select_model(args, device):
     # Model ID is assigned according to the order of the submissions.
     # Different networks are trained with input range of either [0,1] or [0,255]. The range is determined manually.
     model_id = args.model_id
-    if model_id == 0:
+    if model_id == 8:
+
         # DAT baseline, ICCV 2023
-        from models.team00_DAT import main as DAT
-        name = f"{model_id:02}_DAT_baseline"
-        model_path = os.path.join('model_zoo', 'team00_dat.pth')
-        model_func = DAT
+        from models.team08_HAT-F import main as HAT
+        name = f"{model_id:08}_HAT-F_baseline"
+        model_path = os.path.join('model_zoo', 'HAT-F.pth')
+        model_func = HAT
     else:
         raise NotImplementedError(f"Model {model_id} is not implemented.")
 
@@ -36,7 +37,7 @@ def run(model_func, model_name, model_path, device, args, mode="test"):
     elif mode == "test":
         data_path = args.test_dir
     assert data_path is not None, "Please specify the dataset path for validation or test."
-    
+
     save_path = os.path.join(args.save_dir, model_name, mode)
     util.mkdir(save_path)
 
@@ -78,16 +79,18 @@ def main(args):
     # if model not in results:
     if args.valid_dir is not None:
         run(model_func, model_name, model_path, device, args, mode="valid")
-        
+
     if args.test_dir is not None:
         run(model_func, model_name, model_path, device, args, mode="test")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("NTIRE2025-ImageSRx4")
     parser.add_argument("--valid_dir", default=None, type=str, help="Path to the validation set")
-    parser.add_argument("--test_dir", default=None, type=str, help="Path to the test set")
+    parser.add_argument("--test_dir", default='/public/home/cc_1313/project/HAT-main/testsata/X4', type=str,
+                        help="Path to the test set")
     parser.add_argument("--save_dir", default="NTIRE2025-ImageSRx4/results", type=str)
-    parser.add_argument("--model_id", default=0, type=int)
+    parser.add_argument("--model_id", default=8, type=int)
 
     args = parser.parse_args()
     pprint(args)

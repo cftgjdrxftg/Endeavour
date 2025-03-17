@@ -10,14 +10,14 @@ from utils.model_summary import get_model_flops
 from utils import utils_logger
 from utils import utils_image as util
 
-from models.team02_HAT.model import HAT
+from models.team08_HAT-F.model import HAT
 import torch.nn.functional as F
 import torchvision.transforms as T
 import torch
 
 
 
-def forward(img_lq, model, tile=None, tile_overlap=32, scale=4, window_size=16): 
+def forward(img_lq, model, tile=None, tile_overlap=32, scale=4, window_size=16):
     if tile is None:
         def _test_pad(lq):
             # pad to a multiple of window_size
@@ -58,7 +58,7 @@ def forward(img_lq, model, tile=None, tile_overlap=32, scale=4, window_size=16):
         # 去除 padding
         _, _, h, w = output.size()
         output = output[:, :, 0:h - mod_pad_h * scale, 0:w - mod_pad_w * scale]
-    
+
         return output
 
     else:
@@ -143,7 +143,7 @@ def main(model_dir, input_path, output_path, device=None):
     # load model
     # --------------------------------
     # DAT baseline, ICCV 2023
-    
+
     model = HAT()
     # model.load_state_dict(torch.load(model_dir), strict=True)
     # 加载模型状态字典
@@ -154,11 +154,11 @@ def main(model_dir, input_path, output_path, device=None):
         model.load_state_dict(state_dict['params_ema'], strict=True)
     else:
         model.load_state_dict(state_dict, strict=True)
-   
+
     model.eval()
     tile = None
     for k, v in model.named_parameters():
         v.requires_grad = False
     model = model.to(device)
-    
+
     run(model, input_path, output_path, tile, device)
