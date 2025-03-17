@@ -37,25 +37,25 @@ def forward(img_lq, model, tile=None, tile_overlap=32, scale=4, window_size=16):
         img_lq, mod_pad_h, mod_pad_w = _test_pad(img_lq)
 
         with torch.no_grad():
-            # 原图推理
+
             output = model(img_lq)
 
-            # 旋转增强推理
+
             output += torch.rot90(model(torch.rot90(img_lq, 1, dims=[2,3])), 3, dims=[2,3])
             output += torch.rot90(model(torch.rot90(img_lq, 2, dims=[2,3])), 2, dims=[2,3])
             output += torch.rot90(model(torch.rot90(img_lq, 3, dims=[2,3])), 1, dims=[2,3])
 
-            # 水平翻转 + 旋转
+
             h_transform = T.RandomHorizontalFlip(p=1)
             output += h_transform(model(h_transform(img_lq)))
             output += h_transform(torch.rot90(model(torch.rot90(h_transform(img_lq), 1, dims=[2,3])), 3, dims=[2,3]))
             output += h_transform(torch.rot90(model(torch.rot90(h_transform(img_lq), 2, dims=[2,3])), 2, dims=[2,3]))
             output += h_transform(torch.rot90(model(torch.rot90(h_transform(img_lq), 3, dims=[2,3])), 1, dims=[2,3]))
 
-            # 取平均
+
             output /= 8
 
-        # 去除 padding
+
         _, _, h, w = output.size()
         output = output[:, :, 0:h - mod_pad_h * scale, 0:w - mod_pad_w * scale]
 
@@ -149,7 +149,7 @@ def main(model_dir, input_path, output_path, device=None):
     # 加载模型状态字典
     state_dict = torch.load(model_dir)
 
-    # 如果需要使用 'params_ema'，可以选择性地更新状态字典
+
     if 'params_ema' in state_dict:
         model.load_state_dict(state_dict['params_ema'], strict=True)
     else:

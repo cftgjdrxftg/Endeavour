@@ -265,10 +265,10 @@ class HAB(nn.Module):
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         self.use_spectral = use_spectral
         if self.use_spectral:
-            self.frequency_gate = nn.Parameter(torch.ones(1, 1, 1, dim))  # 可学习的频域门控
-            self.spectral_norm = norm_layer(dim)  # 频域归一化层
-            self.spectral_weight = nn.Parameter(torch.tensor(0.01))  # 可学习权重
-            self.spectral_weight.data.clamp_(0, 1)  # 约束范围，防止变成负数
+            self.frequency_gate = nn.Parameter(torch.ones(1, 1, 1, dim))
+            self.spectral_norm = norm_layer(dim)
+            self.spectral_weight = nn.Parameter(torch.tensor(0.01))
+            self.spectral_weight.data.clamp_(0, 1)
 
     def forward(self, x, x_size, rpi_sa, attn_mask):
         h, w = x_size
@@ -285,24 +285,24 @@ class HAB(nn.Module):
 
         #print(f"conv_x (after spectral fusion) shape: {conv_x.shape}, values: {conv_x}")
 
-        # 新增频域处理分支
+
         if self.use_spectral:
-            # 转换到频域
+
             x_spatial = x.permute(0, 3, 1, 2)  # [b,c,h,w]
             x_freq = torch.fft.rfft2(x_spatial, norm='ortho')
             
             x_freq = x_freq.permute(0, 2, 3, 1)
-            # 频域处理（可添加更多操作）
-            x_freq = x_freq * self.frequency_gate  # 可学习的频域门控
+
+            x_freq = x_freq * self.frequency_gate
             
             x_freq = x_freq.permute(0, 3, 1, 2)
-            # 转换回空间域
+
             x_freq = torch.fft.irfft2(x_freq, s=(h, w), norm='ortho')
             x_freq = x_freq.permute(0, 2, 3, 1).contiguous()
             x_freq = self.spectral_norm(x_freq.view(b, h*w, c))
             #print(f"x_freq (after iFFT & norm) shape: {x_freq.shape}, values: {x_freq}")
-            # 融合频域特征
-            conv_x = conv_x + torch.nn.functional.softplus(self.spectral_weight) * x_freq  # 将频域特征与卷积特征融合
+
+            conv_x = conv_x + torch.nn.functional.softplus(self.spectral_weight) * x_freq  
             #print(f"conv_x (after spectral fusion) shape: {conv_x.shape}, values: {conv_x}")
 
         # cyclic shift
