@@ -8,6 +8,7 @@ from basicsr.archs.arch_util import to_2tuple, trunc_normal_
 
 from einops import rearrange
 
+
 def drop_path(x, drop_prob: float = 0., training: bool = False):
     """Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
 
@@ -16,7 +17,7 @@ def drop_path(x, drop_prob: float = 0., training: bool = False):
     if drop_prob == 0. or not training:
         return x
     keep_prob = 1 - drop_prob
-    shape = (x.shape[0], ) + (1, ) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
     random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
     random_tensor.floor_()  # binarize
     output = x.div(keep_prob) * random_tensor
@@ -68,7 +69,7 @@ class CAB(nn.Module):
             nn.GELU(),
             nn.Conv2d(num_feat // compress_ratio, num_feat, 3, 1, 1),
             ChannelAttention(num_feat, squeeze_factor)
-            )
+        )
 
     def forward(self, x):
         return self.cab(x)
@@ -147,7 +148,7 @@ class WindowAttention(nn.Module):
         self.window_size = window_size  # Wh, Ww
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim**-0.5
+        self.scale = qk_scale or head_dim ** -0.5
 
         # define a parameter table of relative position bias
         self.relative_position_bias_table = nn.Parameter(
@@ -265,10 +266,7 @@ class HAB(nn.Module):
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
         self.use_spectral = use_spectral
         if self.use_spectral:
-            self.frequency_gate = nn.Parameter(torch.ones(1, 1, 1, dim))
-            self.spectral_norm = norm_layer(dim)
-            self.spectral_weight = nn.Parameter(torch.tensor(0.01))
-            self.spectral_weight.data.clamp_(0, 1)
+            self.spectral_weight = nn.Parameter(torch.tensor(0.0001))
 
     def forward(self, x, x_size, rpi_sa, attn_mask):
         h, w = x_size
@@ -283,27 +281,24 @@ class HAB(nn.Module):
         conv_x = self.conv_block(x.permute(0, 3, 1, 2))
         conv_x = conv_x.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
 
-        #print(f"conv_x (after spectral fusion) shape: {conv_x.shape}, values: {conv_x}")
-
+        # print(f"conv_x (after spectral fusion) shape: {conv_x.shape}, values: {conv_x}")
 
         if self.use_spectral:
-
-            x_spatial = x.permute(0, 3, 1, 2)  # [b,c,h,w]
+            x_spatial = x.permute(0, 3, 1, 2)  # [b, c, h, w]
             x_freq = torch.fft.rfft2(x_spatial, norm='ortho')
-            
-            x_freq = x_freq.permute(0, 2, 3, 1)
 
-            x_freq = x_freq * self.frequency_gate
-            
-            x_freq = x_freq.permute(0, 3, 1, 2)
+            low_freq = torch.zeros_like(x_freq)
+            low_freq[:, :, :h // 4, :w // 4] = x_freq[:, :, :h // 4, :w // 4]
 
-            x_freq = torch.fft.irfft2(x_freq, s=(h, w), norm='ortho')
-            x_freq = x_freq.permute(0, 2, 3, 1).contiguous()
-            x_freq = self.spectral_norm(x_freq.view(b, h*w, c))
-            #print(f"x_freq (after iFFT & norm) shape: {x_freq.shape}, values: {x_freq}")
+            high_freq = x_freq - low_freq
 
-            conv_x = conv_x + torch.nn.functional.softplus(self.spectral_weight) * x_freq  
-            #print(f"conv_x (after spectral fusion) shape: {conv_x.shape}, values: {conv_x}")
+            low_freq_spatial = torch.fft.irfft2(low_freq, s=(h, w), norm='ortho')
+            high_freq_spatial = torch.fft.irfft2(high_freq, s=(h, w), norm='ortho')
+
+            low_freq_spatial = low_freq_spatial.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
+            high_freq_spatial = high_freq_spatial.permute(0, 2, 3, 1).contiguous().view(b, h * w, c)
+
+            conv_x = conv_x + self.spectral_weight * (low_freq_spatial + high_freq_spatial)
 
         # cyclic shift
         if self.shift_size > 0:
@@ -382,37 +377,38 @@ class OCAB(nn.Module):
     # overlapping cross-attention block
 
     def __init__(self, dim,
-                input_resolution,
-                window_size,
-                overlap_ratio,
-                num_heads,
-                qkv_bias=True,
-                qk_scale=None,
-                mlp_ratio=2,
-                norm_layer=nn.LayerNorm
-                ):
-
+                 input_resolution,
+                 window_size,
+                 overlap_ratio,
+                 num_heads,
+                 qkv_bias=True,
+                 qk_scale=None,
+                 mlp_ratio=2,
+                 norm_layer=nn.LayerNorm
+                 ):
         super().__init__()
         self.dim = dim
         self.input_resolution = input_resolution
         self.window_size = window_size
         self.num_heads = num_heads
         head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim**-0.5
+        self.scale = qk_scale or head_dim ** -0.5
         self.overlap_win_size = int(window_size * overlap_ratio) + window_size
 
         self.norm1 = norm_layer(dim)
-        self.qkv = nn.Linear(dim, dim * 3,  bias=qkv_bias)
-        self.unfold = nn.Unfold(kernel_size=(self.overlap_win_size, self.overlap_win_size), stride=window_size, padding=(self.overlap_win_size-window_size)//2)
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.unfold = nn.Unfold(kernel_size=(self.overlap_win_size, self.overlap_win_size), stride=window_size,
+                                padding=(self.overlap_win_size - window_size) // 2)
 
         # define a parameter table of relative position bias
         self.relative_position_bias_table = nn.Parameter(
-            torch.zeros((window_size + self.overlap_win_size - 1) * (window_size + self.overlap_win_size - 1), num_heads))  # 2*Wh-1 * 2*Ww-1, nH
+            torch.zeros((window_size + self.overlap_win_size - 1) * (window_size + self.overlap_win_size - 1),
+                        num_heads))  # 2*Wh-1 * 2*Ww-1, nH
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
         self.softmax = nn.Softmax(dim=-1)
 
-        self.proj = nn.Linear(dim,dim)
+        self.proj = nn.Linear(dim, dim)
 
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
@@ -426,30 +422,32 @@ class OCAB(nn.Module):
         x = self.norm1(x)
         x = x.view(b, h, w, c)
 
-        qkv = self.qkv(x).reshape(b, h, w, 3, c).permute(3, 0, 4, 1, 2) # 3, b, c, h, w
-        q = qkv[0].permute(0, 2, 3, 1) # b, h, w, c
-        kv = torch.cat((qkv[1], qkv[2]), dim=1) # b, 2*c, h, w
+        qkv = self.qkv(x).reshape(b, h, w, 3, c).permute(3, 0, 4, 1, 2)  # 3, b, c, h, w
+        q = qkv[0].permute(0, 2, 3, 1)  # b, h, w, c
+        kv = torch.cat((qkv[1], qkv[2]), dim=1)  # b, 2*c, h, w
 
         # partition windows
         q_windows = window_partition(q, self.window_size)  # nw*b, window_size, window_size, c
         q_windows = q_windows.view(-1, self.window_size * self.window_size, c)  # nw*b, window_size*window_size, c
 
-        kv_windows = self.unfold(kv) # b, c*w*w, nw
-        kv_windows = rearrange(kv_windows, 'b (nc ch owh oww) nw -> nc (b nw) (owh oww) ch', nc=2, ch=c, owh=self.overlap_win_size, oww=self.overlap_win_size).contiguous() # 2, nw*b, ow*ow, c
-        k_windows, v_windows = kv_windows[0], kv_windows[1] # nw*b, ow*ow, c
+        kv_windows = self.unfold(kv)  # b, c*w*w, nw
+        kv_windows = rearrange(kv_windows, 'b (nc ch owh oww) nw -> nc (b nw) (owh oww) ch', nc=2, ch=c,
+                               owh=self.overlap_win_size, oww=self.overlap_win_size).contiguous()  # 2, nw*b, ow*ow, c
+        k_windows, v_windows = kv_windows[0], kv_windows[1]  # nw*b, ow*ow, c
 
         b_, nq, _ = q_windows.shape
         _, n, _ = k_windows.shape
         d = self.dim // self.num_heads
-        q = q_windows.reshape(b_, nq, self.num_heads, d).permute(0, 2, 1, 3) # nw*b, nH, nq, d
-        k = k_windows.reshape(b_, n, self.num_heads, d).permute(0, 2, 1, 3) # nw*b, nH, n, d
-        v = v_windows.reshape(b_, n, self.num_heads, d).permute(0, 2, 1, 3) # nw*b, nH, n, d
+        q = q_windows.reshape(b_, nq, self.num_heads, d).permute(0, 2, 1, 3)  # nw*b, nH, nq, d
+        k = k_windows.reshape(b_, n, self.num_heads, d).permute(0, 2, 1, 3)  # nw*b, nH, n, d
+        v = v_windows.reshape(b_, n, self.num_heads, d).permute(0, 2, 1, 3)  # nw*b, nH, n, d
 
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
 
         relative_position_bias = self.relative_position_bias_table[rpi.view(-1)].view(
-            self.window_size * self.window_size, self.overlap_win_size * self.overlap_win_size, -1)  # ws*ws, wse*wse, nH
+            self.window_size * self.window_size, self.overlap_win_size * self.overlap_win_size,
+            -1)  # ws*ws, wse*wse, nH
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, ws*ws, wse*wse
         attn = attn + relative_position_bias.unsqueeze(0)
 
@@ -531,21 +529,21 @@ class AttenBlocks(nn.Module):
                 drop=drop,
                 attn_drop=attn_drop,
                 drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
-                norm_layer=norm_layer,use_spectral=use_spectral) for i in range(depth)
+                norm_layer=norm_layer, use_spectral=use_spectral) for i in range(depth)
         ])
 
         # OCAB
         self.overlap_attn = OCAB(
-                            dim=dim,
-                            input_resolution=input_resolution,
-                            window_size=window_size,
-                            overlap_ratio=overlap_ratio,
-                            num_heads=num_heads,
-                            qkv_bias=qkv_bias,
-                            qk_scale=qk_scale,
-                            mlp_ratio=mlp_ratio,
-                            norm_layer=norm_layer
-                            )
+            dim=dim,
+            input_resolution=input_resolution,
+            window_size=window_size,
+            overlap_ratio=overlap_ratio,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            qk_scale=qk_scale,
+            mlp_ratio=mlp_ratio,
+            norm_layer=norm_layer
+        )
 
         # patch merging layer
         if downsample is not None:
@@ -608,7 +606,7 @@ class RHAG(nn.Module):
                  use_checkpoint=False,
                  img_size=224,
                  patch_size=4,
-                 resi_connection='1conv',use_spectral=True):
+                 resi_connection='1conv', use_spectral=True):
         super(RHAG, self).__init__()
 
         self.dim = dim
@@ -632,7 +630,7 @@ class RHAG(nn.Module):
             drop_path=drop_path,
             norm_layer=norm_layer,
             downsample=downsample,
-            use_checkpoint=use_checkpoint,use_spectral=use_spectral)
+            use_checkpoint=use_checkpoint, use_spectral=use_spectral)
 
         if resi_connection == '1conv':
             self.conv = nn.Conv2d(dim, dim, 3, 1, 1)
@@ -940,7 +938,7 @@ class HAT(nn.Module):
         coords_ext = torch.stack(torch.meshgrid([coords_h, coords_w]))  # 2, wse, wse
         coords_ext_flatten = torch.flatten(coords_ext, 1)  # 2, wse*wse
 
-        relative_coords = coords_ext_flatten[:, None, :] - coords_ori_flatten[:, :, None]   # 2, ws*ws, wse*wse
+        relative_coords = coords_ext_flatten[:, None, :] - coords_ori_flatten[:, :, None]  # 2, ws*ws, wse*wse
 
         relative_coords = relative_coords.permute(1, 2, 0).contiguous()  # ws*ws, wse*wse, 2
         relative_coords[:, :, 0] += window_size_ori - window_size_ext + 1  # shift to start from 0
@@ -982,10 +980,11 @@ class HAT(nn.Module):
     def forward_features(self, x):
         x_size = (x.shape[2], x.shape[3])
 
-        # Calculate attention mask and relative position index in advance to speed up inference. 
+        # Calculate attention mask and relative position index in advance to speed up inference.
         # The original code is very time-consuming for large window size.
         attn_mask = self.calculate_mask(x_size).to(x.device)
-        params = {'attn_mask': attn_mask, 'rpi_sa': self.relative_position_index_SA, 'rpi_oca': self.relative_position_index_OCA}
+        params = {'attn_mask': attn_mask, 'rpi_sa': self.relative_position_index_SA,
+                  'rpi_oca': self.relative_position_index_OCA}
 
         x = self.patch_embed(x)
         if self.ape:
