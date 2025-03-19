@@ -19,8 +19,6 @@ The results are saved in `[path to your save dir]/08_HAT-F_baseline/test`
 CUDA_VISIBLE_DEVICES=0 python eval.py --output_folder [[path to your save dir]/08_HAT-F_baseline/test] --target_folder [path to test_dir HR]  --metrics_save_path [./IQA_results] --gpu_ids 0
 ```
 
-
-
 ## How to test the baseline model?
 
 1. `git clone https://github.com/zhengchen1999/NTIRE2025_ImageSR_x4.git`
@@ -110,6 +108,16 @@ The `eval.py` file accepts the following 4 parameters:
 - `target_folder`: Path to the HR images in the `test` dataset. This is used to calculate FR-IQA metrics.
 - `metrics_save_path`: Directory where the evaluation metrics will be saved.
 - `device`: Computation devices. For multi-GPU setups, use the format `0,1,2,3`.
+
+### Weighted score for Perception Quality Track
+
+We use the following equation to calculate the final weight score: 
+
+$$
+\text{Score} = \left(1 - \text{LPIPS}\right) + \left(1 - \text{DISTS}\right) + \text{CLIPIQA} + \text{MANIQA} + \frac{\text{MUSIQ}}{100} + \max\left(0, \frac{10 - \text{NIQE}}{10}\right). 
+$$
+
+The score is calculated on the averaged IQA scores. 
 
 ## License and Acknowledgement
 This code repository is release under [MIT License](LICENSE). 
