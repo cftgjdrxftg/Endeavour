@@ -11,12 +11,12 @@
 CUDA_VISIBLE_DEVICES=0 python test.py --test_dir [path to test data dir] --save_dir [path to your save dir] --model_id 8
 ```
 
-The results are saved in `[path to your save dir]/08_HAT-F_baseline/test`
+The results are saved in `[path to your save dir]/8_HAT-F_baseline/test`
 
 ## How to test?
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python eval.py --output_folder [[path to your save dir]/08_HAT-F_baseline/test] --target_folder [path to test_dir HR]  --metrics_save_path [./IQA_results] --gpu_ids 0
+CUDA_VISIBLE_DEVICES=0 python eval.py --output_folder [[path to your save dir]/8_HAT-F_baseline/test] --target_folder [path to test_dir HR]  --metrics_save_path [./IQA_results] --gpu_ids 0
 ```
 
 ## How to test the baseline model?

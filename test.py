@@ -18,8 +18,8 @@ def select_model(args, device):
     if model_id == 8:
 
         # DAT baseline, ICCV 2023
-        from models.team08_HAT-F import main as HAT
-        name = f"{model_id:08}_HAT-F_baseline"
+        from models.team08_HAT_F import main as HAT
+        name = f"{model_id}_HAT-F_baseline"
         model_path = os.path.join('model_zoo', 'HAT-F.pth')
         model_func = HAT
     else:

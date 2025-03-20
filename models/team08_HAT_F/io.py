@@ -10,7 +10,7 @@ from utils.model_summary import get_model_flops
 from utils import utils_logger
 from utils import utils_image as util
 
-from models.team08_HAT-F.model import HAT
+from models.team08_HAT_F.model import HAT
 import torch.nn.functional as F
 import torchvision.transforms as T
 import torch
